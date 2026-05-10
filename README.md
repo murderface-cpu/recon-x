@@ -1,7 +1,7 @@
-# RECON-X — Attack Surface Intelligence Platform
+# RECON-X - Attack Surface Intelligence Platform
 
 A Python Flask web app that combines multiple open-source security libraries to
-perform real-time, streaming attack surface recon — inspired by the
+perform real-time, streaming attack surface recon inspired by the
 projectdiscovery Go ecosystem (nuclei, httpx, tlsx, wappalyzergo, cdncheck, asnmap).
 
 ## Architecture
