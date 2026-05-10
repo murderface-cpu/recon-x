@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RECON-X — Attack Surface Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,100;0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & BASE ───────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #05080f;
+  --bg-card:   #080d18;
+  --bg-hover:  #0c1525;
+  --border:    #0d2040;
+  --border-hi: #0d3a6b;
+  --cyan:      #00d4ff;
+  --cyan-dim:  #006f84;
+  --cyan-glow: rgba(0,212,255,.18);
+  --purple:    #7c3aed;
+  --amber:     #f59e0b;
+  --red:       #ef4444;
+  --green:     #10b981;
+  --green2:    #34d399;
+  --text:      #c8d8e8;
+  --text-dim:  #4a6a80;
+  --text-muted:#2a4560;
+  --font-ui:   'Rajdhani', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ─── GRID BACKGROUND ────────────────────────────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* ─── SCANLINE OVERLAY ───────────────────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0,0,0,.08) 3px,
+    rgba(0,0,0,.08) 4px
+  );
+  pointer-events: none;
+}
+
+#app { position: relative; z-index: 1; }
+
+/* ─── HEADER / HERO ──────────────────────────────────────────────────── */
+header {
+  padding: 2.5rem 2rem 2rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.logo-ring {
+  width: 64px; height: 64px;
+  margin: 0 auto 1rem;
+  position: relative;
+}
+.logo-ring svg { width: 100%; height: 100%; }
+.logo-ring .ring { animation: spin-slow 8s linear infinite; transform-origin: 32px 32px; }
+.logo-ring .ring2 { animation: spin-slow 5s linear infinite reverse; transform-origin: 32px 32px; }
+
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+
+h1 {
+  font-family: var(--font-ui);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: .25em;
+  text-transform: uppercase;
+  color: #fff;
+}
+h1 span { color: var(--cyan); text-shadow: 0 0 20px var(--cyan); }
+
+.tagline {
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  color: var(--text-dim);
+  letter-spacing: .15em;
+  margin-top: .4rem;
+}
+
+.lib-badges {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem;
+  margin-top: 1rem;
+}
+.badge {
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  padding: .15rem .55rem;
+  border-radius: 2px;
+  border: 1px solid var(--border-hi);
+  color: var(--cyan-dim);
+  letter-spacing: .05em;
+  opacity: .7;
+}
+
+/* ─── SCAN FORM ──────────────────────────────────────────────────────── */
+.scan-form-wrap {
+  max-width: 720px; margin: 2.5rem auto; padding: 0 1.5rem;
+}
+.scan-form {
+  display: flex; gap: .75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hi);
+  border-radius: 4px;
+  padding: .5rem .5rem .5rem 1rem;
+  box-shadow: 0 0 30px rgba(0,212,255,.06);
+  transition: box-shadow .3s;
+}
+.scan-form:focus-within { box-shadow: 0 0 40px rgba(0,212,255,.14); border-color: var(--cyan-dim); }
+
+#target-input {
+  flex: 1;
+  background: none; border: none; outline: none;
+  font-family: var(--font-mono);
+  font-size: .9rem;
+  color: var(--cyan);
+  caret-color: var(--cyan);
+}
+#target-input::placeholder { color: var(--text-muted); }
+
+#scan-btn {
+  background: var(--cyan);
+  color: #000;
+  border: none; border-radius: 3px;
+  padding: .55rem 1.4rem;
+  font-family: var(--font-ui);
+  font-size: .85rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+}
+#scan-btn:hover { background: #fff; }
+#scan-btn:disabled { background: var(--cyan-dim); color: #001520; cursor: not-allowed; opacity: .7; }
+
+/* ─── STATUS BAR ─────────────────────────────────────────────────────── */
+#status-bar {
+  max-width: 1200px; margin: 0 auto;
+  padding: .6rem 1.5rem;
+  font-family: var(--font-mono);
+  font-size: .72rem;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 1rem;
+  min-height: 2.5rem;
+  display: none;
+}
+#status-bar.visible { display: flex; }
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  animation: pulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse { 0%,100%{ opacity:1; transform:scale(1); } 50%{ opacity:.5; transform:scale(.8); } }
+.status-dot.done { background: var(--green); box-shadow: 0 0 8px var(--green); animation: none; }
+
+/* ─── MODULE STATUS TRACK ────────────────────────────────────────────── */
+#module-track {
+  max-width: 1200px; margin: 1.2rem auto 0;
+  padding: 0 1.5rem;
+  display: none;
+}
+#module-track.visible { display: block; }
+.track-label {
+  font-family: var(--font-mono);
+  font-size: .6rem; letter-spacing: .12em;
+  color: var(--text-muted); text-transform: uppercase;
+  margin-bottom: .5rem;
+}
+.module-pills {
+  display: flex; flex-wrap: wrap; gap: .4rem;
+}
+.mpill {
+  font-family: var(--font-mono);
+  font-size: .65rem;
+  padding: .2rem .65rem;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--text-muted);
+  letter-spacing: .08em;
+  transition: all .4s;
+  position: relative;
+  overflow: hidden;
+}
+.mpill::after {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 0; background: var(--cyan-glow);
+  transition: width .4s ease;
+}
+.mpill.scanning { color: var(--cyan); border-color: var(--cyan-dim); }
+.mpill.scanning::after { width: 100%; }
+.mpill.done     { color: var(--green2); border-color: #06543a; }
+.mpill.done::after { width: 100%; background: rgba(16,185,129,.1); }
+
+/* ─── MAIN GRID ──────────────────────────────────────────────────────── */
+#results {
+  max-width: 1200px; margin: 1.5rem auto 3rem;
+  padding: 0 1.5rem;
+  display: none;
+}
+#results.visible { display: block; }
+
+/* ─── RISK SCORE ROW ─────────────────────────────────────────────────── */
+#risk-row {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.risk-gauge-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1.5rem;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  min-height: 200px;
+}
+
+#risk-gauge-svg { width: 140px; height: 140px; }
+.gauge-score {
+  position: absolute;
+  font-family: var(--font-ui);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+}
+.gauge-grade {
+  font-size: .85rem;
+  letter-spacing: .15em;
+  font-weight: 600;
+}
+
+.sev-breakdown {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1.2rem 1.5rem;
+}
+.sev-title {
+  font-size: .7rem; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--text-dim); margin-bottom: 1rem;
+  font-family: var(--font-mono);
+}
+.sev-bars { display: flex; flex-direction: column; gap: .6rem; }
+.sev-bar-row { display: flex; align-items: center; gap: .75rem; }
+.sev-bar-label { font-family: var(--font-mono); font-size: .7rem; width: 60px; flex-shrink: 0; }
+.sev-bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.sev-bar-fill { height: 100%; border-radius: 2px; width: 0; transition: width 1s ease; }
+.sev-bar-count { font-family: var(--font-mono); font-size: .7rem; color: var(--text-dim); width: 24px; text-align: right; }
+
+/* ─── FINDINGS CARDS GRID ────────────────────────────────────────────── */
+#cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.mod-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity .5s ease, transform .5s ease, border-color .3s;
+}
+.mod-card.visible { opacity: 1; transform: none; }
+.mod-card:hover { border-color: var(--border-hi); }
+
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.card-header:hover { background: var(--bg-hover); }
+
+.card-title {
+  display: flex; align-items: center; gap: .55rem;
+  font-family: var(--font-ui);
+  font-size: .85rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.card-icon { font-size: 1rem; opacity: .9; }
+.card-status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-muted);
+  margin-left: auto; margin-right: .5rem;
+  transition: background .3s, box-shadow .3s;
+}
+.card-status-dot.scanning { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); animation: pulse 1s infinite; }
+.card-status-dot.done     { background: var(--green); box-shadow: 0 0 6px var(--green); animation: none; }
+.card-chevron {
+  font-size: .7rem; color: var(--text-muted);
+  transition: transform .3s;
+}
+.card-header.collapsed .card-chevron { transform: rotate(-90deg); }
+
+.card-body { padding: .75rem 1rem; }
+.card-body.hidden { display: none; }
+
+/* Finding rows */
+.finding-row {
+  display: flex; align-items: flex-start; gap: .6rem;
+  padding: .3rem 0;
+  border-bottom: 1px solid rgba(13,32,64,.4);
+  font-size: .8rem;
+}
+.finding-row:last-child { border-bottom: none; }
+.finding-tag {
+  font-family: var(--font-mono);
+  font-size: .62rem; letter-spacing: .06em;
+  padding: .1rem .45rem; border-radius: 2px;
+  white-space: nowrap; flex-shrink: 0;
+  border: 1px solid;
+}
+.tag-info     { color: var(--cyan-dim);  border-color: var(--cyan-dim);   background: rgba(0,212,255,.06); }
+.tag-good     { color: var(--green);     border-color: #065f46;           background: rgba(16,185,129,.08); }
+.tag-warning  { color: var(--amber);     border-color: #78350f;           background: rgba(245,158,11,.08); }
+.tag-error    { color: #f87171;          border-color: #7f1d1d;           background: rgba(239,68,68,.08); }
+.tag-critical { color: #fca5a5;          border-color: #991b1b;           background: rgba(239,68,68,.12); }
+.tag-high     { color: var(--amber);     border-color: #78350f;           background: rgba(245,158,11,.08); }
+.tag-medium   { color: #fbbf24;          border-color: #6b4e0f;           background: rgba(251,191,36,.06); }
+.tag-low      { color: #94a3b8;          border-color: #334155;           background: rgba(148,163,184,.06); }
+
+.finding-label {
+  color: var(--text-dim);
+  font-family: var(--font-mono); font-size: .7rem;
+  min-width: 100px; flex-shrink: 0;
+}
+.finding-value {
+  font-family: var(--font-mono); font-size: .72rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+/* Tech chips */
+.tech-chips { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem 0; }
+.tech-chip {
+  font-family: var(--font-mono); font-size: .65rem;
+  padding: .2rem .6rem; border-radius: 2px;
+  background: rgba(124,58,237,.12);
+  border: 1px solid rgba(124,58,237,.3);
+  color: #a78bfa;
+  letter-spacing: .04em;
+}
+
+/* Port chips */
+.port-chips { display: flex; flex-wrap: wrap; gap: .35rem; padding: .4rem 0; }
+.port-chip {
+  font-family: var(--font-mono); font-size: .65rem;
+  padding: .2rem .55rem; border-radius: 2px;
+}
+.port-high   { background: rgba(239,68,68,.12); border: 1px solid #991b1b; color: #fca5a5; }
+.port-medium { background: rgba(245,158,11,.1); border: 1px solid #78350f; color: #fcd34d; }
+.port-low    { background: rgba(0,212,255,.07); border: 1px solid var(--cyan-dim); color: var(--cyan-dim); }
+
+/* TLS cert grid */
+.cert-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .3rem .8rem;
+  padding: .4rem 0;
+}
+.cert-item { }
+.cert-key { font-family: var(--font-mono); font-size: .6rem; color: var(--text-dim); letter-spacing: .08em; }
+.cert-val { font-family: var(--font-mono); font-size: .72rem; color: var(--text); word-break: break-all; }
+
+/* Header score bar */
+.header-score-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: .6rem 0;
+}
+.header-score-fill { height: 100%; border-radius: 2px; width: 0; transition: width 1.2s ease; }
+
+/* SAN list */
+.san-list {
+  display: flex; flex-wrap: wrap; gap: .3rem;
+  padding: .4rem 0;
+}
+.san-item {
+  font-family: var(--font-mono); font-size: .65rem;
+  padding: .15rem .5rem; border-radius: 2px;
+  background: rgba(0,212,255,.05);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+/* DNS record table */
+.dns-record { margin-bottom: .5rem; }
+.dns-rtype {
+  font-family: var(--font-mono); font-size: .65rem;
+  color: var(--cyan-dim); letter-spacing: .1em;
+  margin-bottom: .15rem;
+}
+.dns-rval {
+  font-family: var(--font-mono); font-size: .68rem;
+  color: var(--text-dim); padding-left: .5rem;
+  word-break: break-all; line-height: 1.5;
+}
+
+/* ─── RISK ITEMS PANEL ───────────────────────────────────────────────── */
+#risk-items-panel {
+  margin-top: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  opacity: 0; transform: translateY(8px); transition: opacity .6s, transform .6s;
+}
+#risk-items-panel.visible { opacity: 1; transform: none; }
+.rip-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.rip-header:hover { background: var(--bg-hover); }
+.rip-title { font-family: var(--font-ui); font-size: .85rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.rip-count { font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); }
+.risk-item-row {
+  display: flex; align-items: flex-start; gap: .6rem;
+  padding: .5rem 1rem;
+  border-bottom: 1px solid rgba(13,32,64,.3);
+  font-size: .8rem;
+}
+.risk-item-row:last-child { border-bottom: none; }
+.ri-sev {
+  font-family: var(--font-mono); font-size: .6rem;
+  padding: .12rem .4rem; border-radius: 2px;
+  flex-shrink: 0; min-width: 60px; text-align: center;
+  letter-spacing: .06em; text-transform: uppercase;
+}
+.ri-desc { font-family: var(--font-mono); font-size: .7rem; color: var(--text); line-height: 1.5; }
+
+/* ─── STREAM LOG ─────────────────────────────────────────────────────── */
+#stream-log {
+  max-width: 1200px; margin: .5rem auto 0;
+  padding: 0 1.5rem;
+  display: none;
+}
+#stream-log.visible { display: block; }
+.stream-inner {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .75rem 1rem;
+  max-height: 120px; overflow-y: auto;
+  font-family: var(--font-mono); font-size: .65rem;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+.log-line { }
+.log-line .ts { color: var(--text-muted); margin-right: .5rem; }
+.log-line .msg { }
+.log-line.phase .msg { color: var(--cyan); }
+.log-line.complete .msg { color: var(--green); }
+
+/* ─── EMPTY STATE ────────────────────────────────────────────────────── */
+#empty-state {
+  text-align: center; padding: 4rem 1rem;
+}
+.empty-art {
+  font-family: var(--font-mono); font-size: .65rem;
+  line-height: 1.4; color: var(--text-muted);
+  margin-bottom: 1.5rem; letter-spacing: .05em;
+}
+.empty-hint {
+  font-family: var(--font-mono); font-size: .72rem;
+  color: var(--text-dim);
+}
+
+/* ─── RESPONSIVE ─────────────────────────────────────────────────────── */
+@media(max-width:700px){
+  #risk-row { grid-template-columns: 1fr; }
+  .cert-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── HEADER ──────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo-ring">
+    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="32" cy="32" r="28" stroke="#0d2040" stroke-width="1"/>
+      <g class="ring">
+        <circle cx="32" cy="32" r="24" stroke="#006f84" stroke-width="1" stroke-dasharray="4 6"/>
+      </g>
+      <g class="ring2">
+        <circle cx="32" cy="32" r="18" stroke="#0d3a6b" stroke-width="1" stroke-dasharray="3 8"/>
+      </g>
+      <circle cx="32" cy="32" r="4" fill="#00d4ff" opacity=".9"/>
+      <circle cx="32" cy="32" r="8" stroke="#00d4ff" stroke-width=".5" opacity=".3"/>
+      <line x1="32" y1="4" x2="32" y2="14" stroke="#00d4ff" stroke-width="1.5" opacity=".6"/>
+      <line x1="60" y1="32" x2="50" y2="32" stroke="#00d4ff" stroke-width="1.5" opacity=".6"/>
+      <line x1="32" y1="60" x2="32" y2="50" stroke="#00d4ff" stroke-width="1.5" opacity=".6"/>
+      <line x1="4" y1="32" x2="14" y2="32" stroke="#00d4ff" stroke-width="1.5" opacity=".6"/>
+    </svg>
+  </div>
+  <h1>RECON<span>-X</span></h1>
+  <div class="tagline">// ATTACK SURFACE INTELLIGENCE PLATFORM //</div>
+  <div class="lib-badges">
+    <span class="badge">httpx</span><span class="badge">dnspython</span>
+    <span class="badge">cryptography</span><span class="badge">ipwhois</span>
+    <span class="badge">beautifulsoup4</span><span class="badge">flask-sse</span>
+    <span class="badge">concurrent.futures</span><span class="badge">ssl</span>
+  </div>
+</header>
+
+<!-- ── SCAN FORM ──────────────────────────────────────────────────────────── -->
+<div class="scan-form-wrap">
+  <div class="scan-form">
+    <input id="target-input" type="text"
+           placeholder="example.com  |  https://target.io  |  1.2.3.4"
+           autocomplete="off" spellcheck="false">
+    <button id="scan-btn" onclick="startScan()">▶ SCAN</button>
+  </div>
+</div>
+
+<!-- ── STATUS BAR ─────────────────────────────────────────────────────────── -->
+<div id="status-bar">
+  <div class="status-dot" id="status-dot"></div>
+  <span id="status-text" style="font-size:.72rem"></span>
+</div>
+
+<!-- ── MODULE TRACK ───────────────────────────────────────────────────────── -->
+<div id="module-track">
+  <div class="track-label">// modules</div>
+  <div class="module-pills" id="module-pills"></div>
+</div>
+
+<!-- ── STREAM LOG ─────────────────────────────────────────────────────────── -->
+<div id="stream-log">
+  <div class="stream-inner" id="log-inner"></div>
+</div>
+
+<!-- ── RESULTS ────────────────────────────────────────────────────────────── -->
+<div id="results">
+  <div id="risk-row">
+    <div class="risk-gauge-card" id="gauge-card" style="display:none">
+      <svg id="risk-gauge-svg" viewBox="0 0 140 140">
+        <circle cx="70" cy="70" r="56" stroke="#0d2040" stroke-width="10" fill="none"/>
+        <circle id="gauge-track" cx="70" cy="70" r="56" stroke="#00d4ff"
+          stroke-width="10" fill="none"
+          stroke-dasharray="0 352"
+          stroke-dashoffset="88"
+          stroke-linecap="round"
+          style="transition:stroke-dasharray 1.5s ease, stroke .5s"/>
+      </svg>
+      <div class="gauge-score" id="gauge-score-text">
+        <div id="gauge-num">--</div>
+        <div class="gauge-grade" id="gauge-grade" style="color:var(--cyan)">—</div>
+      </div>
+    </div>
+
+    <div class="sev-breakdown" id="sev-breakdown" style="display:none">
+      <div class="sev-title">// risk breakdown</div>
+      <div class="sev-bars" id="sev-bars-inner"></div>
+    </div>
+  </div>
+
+  <div id="cards-grid"></div>
+
+  <div id="risk-items-panel">
+    <div class="rip-header" onclick="togglePanel('risk-items-panel')">
+      <div class="rip-title">⚑ All Risk Findings</div>
+      <div class="rip-count" id="rip-count">0 findings</div>
+      <span class="card-chevron">▾</span>
+    </div>
+    <div id="rip-body" class="card-body"></div>
+  </div>
+</div>
+
+<!-- ── EMPTY STATE ────────────────────────────────────────────────────────── -->
+<div id="empty-state">
+  <pre class="empty-art">
+  ┌─────────────────────────────────────────┐
+  │  DNS ── HTTP ── TLS ── PORTS ── VULNS  │
+  │                                         │
+  │    Enter a domain, IP, or URL above    │
+  │    to launch a full recon scan         │
+  └─────────────────────────────────────────┘</pre>
+  <div class="empty-hint">Powered by nuclei-style checks · wappalyzergo · tlsx · asnmap · cdncheck</div>
+</div>
+
+</div><!-- #app -->
+
+<script>
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  STATE                                                                     */
+/* ────────────────────────────────────────────────────────────────────────── */
+let es = null;
+let scanActive = false;
+
+const MODULES = [
+  { id:'dns',              icon:'🌐', label:'DNS Intelligence'     },
+  { id:'http',             icon:'⚡', label:'HTTP Prober'           },
+  { id:'tls',              icon:'🔐', label:'TLS Inspector'         },
+  { id:'asn',              icon:'🗺️',  label:'ASN / IP Intel'       },
+  { id:'ports',            icon:'🔌', label:'Port Scanner'          },
+  { id:'tech',             icon:'🔬', label:'Tech Fingerprinter'    },
+  { id:'security_headers', icon:'🛡️', label:'Security Headers'     },
+  { id:'vulns',            icon:'⚠️', label:'Vuln Checks'          },
+];
+
+const SEVERITY_COLORS = {
+  critical: '#ef4444', high: '#f59e0b', medium: '#fbbf24',
+  low: '#94a3b8', info: '#4a6a80'
+};
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  HELPERS                                                                   */
+/* ────────────────────────────────────────────────────────────────────────── */
+function ts() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+}
+
+function log(msg, cls='') {
+  const el = document.getElementById('log-inner');
+  const line = document.createElement('div');
+  line.className = `log-line ${cls}`;
+  line.innerHTML = `<span class="ts">[${ts()}]</span><span class="msg">${msg}</span>`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function show(id) { const el=document.getElementById(id); if(el){el.style.display=''; el.classList.add('visible'); } }
+function hide(id) { const el=document.getElementById(id); if(el) el.style.display='none'; }
+
+function tagClass(status) {
+  if(!status) return 'tag-info';
+  const s = status.toLowerCase();
+  if(s==='good') return 'tag-good';
+  if(s==='warning'||s==='medium') return 'tag-warning';
+  if(s==='error'||s==='high') return 'tag-error';
+  if(s==='critical') return 'tag-critical';
+  return 'tag-info';
+}
+
+function sev_badge(sev) {
+  const cl = {critical:'tag-critical',high:'tag-high',medium:'tag-medium',
+               low:'tag-low',info:'tag-info'}[sev]||'tag-low';
+  return `<span class="ri-sev ${cl}">${sev}</span>`;
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  INIT CARDS                                                                */
+/* ────────────────────────────────────────────────────────────────────────── */
+function initCards() {
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+  MODULES.forEach(mod => {
+    grid.innerHTML += `
+    <div class="mod-card" id="card-${mod.id}">
+      <div class="card-header" id="ch-${mod.id}" onclick="toggleCard('${mod.id}')">
+        <div class="card-title">
+          <span class="card-icon">${mod.icon}</span>
+          ${mod.label}
+        </div>
+        <div class="card-status-dot scanning" id="dot-${mod.id}"></div>
+        <span class="card-chevron">▾</span>
+      </div>
+      <div class="card-body" id="cb-${mod.id}">
+        <div style="font-family:var(--font-mono);font-size:.65rem;color:var(--text-muted);padding:.5rem 0">
+          scanning…
+        </div>
+      </div>
+    </div>`;
+  });
+}
+
+function initModulePills() {
+  const pills = document.getElementById('module-pills');
+  pills.innerHTML = '';
+  MODULES.forEach(m => {
+    pills.innerHTML += `<span class="mpill scanning" id="pill-${m.id}">${m.id}</span>`;
+  });
+}
+
+function pillDone(modId) {
+  const pill = document.getElementById('pill-'+modId);
+  if(pill) { pill.classList.remove('scanning'); pill.classList.add('done'); }
+  const dot = document.getElementById('dot-'+modId);
+  if(dot) { dot.classList.remove('scanning'); dot.classList.add('done'); }
+}
+
+function toggleCard(id) {
+  const body = document.getElementById('cb-'+id);
+  const hdr  = document.getElementById('ch-'+id);
+  if(!body) return;
+  body.classList.toggle('hidden');
+  hdr.classList.toggle('collapsed');
+}
+
+function togglePanel(id) {
+  const panel = document.getElementById(id);
+  const body  = panel.querySelector('.card-body, #rip-body');
+  const hdr   = panel.querySelector('.rip-header');
+  if(body) body.classList.toggle('hidden');
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  CARD RENDERERS                                                            */
+/* ────────────────────────────────────────────────────────────────────────── */
+
+function renderFindings(findings=[]) {
+  return findings.map(f => `
+    <div class="finding-row">
+      <span class="finding-tag ${tagClass(f.status)}">${f.status||'info'}</span>
+      <span class="finding-label">${escHtml(f.type||'')}</span>
+      <span class="finding-value">${escHtml(f.value||'')}</span>
+    </div>`).join('');
+}
+
+function escHtml(str='') {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function renderDNS(d) {
+  let html = '';
+  const records = d.records||{};
+  for(const [rtype, vals] of Object.entries(records)) {
+    html += `<div class="dns-record">
+      <div class="dns-rtype">${rtype}</div>
+      <div class="dns-rval">${vals.map(v=>escHtml(v)).join('<br>')}</div>
+    </div>`;
+  }
+  html += renderFindings(d.findings);
+  return html;
+}
+
+function renderHTTP(d) {
+  const resp = (d.responses||[])[0]||{};
+  const chain = d.redirect_chain||[];
+  let html = '';
+  if(resp.status_code) {
+    html += `<div class="finding-row">
+      <span class="finding-tag tag-info">STATUS</span>
+      <span class="finding-value">${resp.status_code} &nbsp;|&nbsp; ${resp.response_time_ms} ms &nbsp;|&nbsp; ${resp.http_version||''}</span>
+    </div>`;
+  }
+  if(chain.length) {
+    html += `<div class="finding-row">
+      <span class="finding-tag tag-info">REDIRECTS</span>
+      <span class="finding-value">${chain.map(r=>`${r.status} → ${escHtml(r.url)}`).join('<br>')}</span>
+    </div>`;
+  }
+  html += renderFindings(d.findings);
+  return html;
+}
+
+function renderTLS(d) {
+  const cert = d.certificate||{};
+  const sans = (cert.sans||[]).slice(0,12);
+  let html = `<div class="cert-grid">`;
+  const rows = [
+    ['Common Name',  cert.common_name],
+    ['Org',          cert.organization],
+    ['Issuer',       cert.issuer],
+    ['Protocol',     d.tls_version],
+    ['Cipher',       d.cipher_suite],
+    ['Key Bits',     d.cipher_bits],
+    ['Valid From',   cert.not_before],
+    ['Expires',      cert.not_after],
+    ['Days Left',    cert.days_until_expiry !== undefined ? cert.days_until_expiry+' days' : null],
+    ['Sig Algo',     cert.sig_algo],
+  ];
+  for(const [k,v] of rows) {
+    if(v!=null) html += `<div class="cert-item">
+      <div class="cert-key">${k}</div>
+      <div class="cert-val">${escHtml(String(v))}</div>
+    </div>`;
+  }
+  html += '</div>';
+  if(sans.length) {
+    html += `<div style="margin-top:.4rem;font-family:var(--font-mono);font-size:.6rem;color:var(--text-dim);margin-bottom:.3rem">SUBJECT ALTERNATIVE NAMES</div>`;
+    html += `<div class="san-list">${sans.map(s=>`<span class="san-item">${escHtml(s)}</span>`).join('')}</div>`;
+  }
+  html += renderFindings(d.findings);
+  return html;
+}
+
+function renderTech(d) {
+  let html = '';
+  if((d.detected||[]).length) {
+    html += `<div class="tech-chips">${(d.detected||[]).map(t=>`<span class="tech-chip">${escHtml(t)}</span>`).join('')}</div>`;
+  }
+  if(d.cdn) {
+    html += `<div class="finding-row">
+      <span class="finding-tag tag-info">CDN</span>
+      <span class="finding-value">${escHtml(d.cdn)}</span>
+    </div>`;
+  }
+  if((d.secrets||[]).length) {
+    for(const s of d.secrets) {
+      html += `<div class="finding-row">
+        <span class="finding-tag tag-critical">SECRET</span>
+        <span class="finding-label">${escHtml(s.type)}</span>
+        <span class="finding-value">${escHtml(s.match)}</span>
+      </div>`;
+    }
+  }
+  return html;
+}
+
+function renderSecHeaders(d) {
+  const score = d.score||0;
+  const color = score>=70?'var(--green)':(score>=45?'var(--amber)':'var(--red)');
+  let html = `
+    <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.5rem">
+      <span style="font-family:var(--font-mono);font-size:.7rem;color:var(--text-dim)">Score</span>
+      <div class="header-score-bar" style="flex:1">
+        <div class="header-score-fill" id="hscore-fill" style="background:${color}"></div>
+      </div>
+      <span style="font-family:var(--font-mono);font-size:.8rem;color:${color};font-weight:600">${score}/100</span>
+    </div>`;
+  for(const h of (d.headers_present||[])) {
+    const st = h.status==='good'?'tag-good':'tag-warning';
+    html += `<div class="finding-row">
+      <span class="finding-tag ${st}">${h.status}</span>
+      <span class="finding-label">${escHtml(h.name)}</span>
+      <span class="finding-value">${escHtml((h.value||'').slice(0,80))}</span>
+    </div>`;
+  }
+  for(const h of (d.headers_missing||[])) {
+    html += `<div class="finding-row">
+      <span class="finding-tag tag-error">MISSING</span>
+      <span class="finding-label">${escHtml(h.name)}</span>
+      <span class="finding-value" style="color:var(--text-muted)">${escHtml(h.rec||'')}</span>
+    </div>`;
+  }
+  setTimeout(()=>{
+    const fill = document.getElementById('hscore-fill');
+    if(fill) fill.style.width = score+'%';
+  }, 400);
+  return html;
+}
+
+function renderASN(d) {
+  return renderFindings(d.findings);
+}
+
+function renderPorts(d) {
+  const ports = d.open_ports||[];
+  if(!ports.length) return '<div style="font-family:var(--font-mono);font-size:.7rem;color:var(--text-muted);padding:.3rem 0">No common ports open</div>';
+  let html = `<div class="port-chips">`;
+  for(const p of ports) {
+    html += `<span class="port-chip port-${p.risk}" title="${escHtml(p.banner||'')}">${p.port}/${p.service}</span>`;
+  }
+  html += '</div>';
+  html += renderFindings(d.findings.filter(f=>f.status==='critical'||f.status==='warning'));
+  return html;
+}
+
+function renderVulns(d) {
+  const findings = d.findings||[];
+  if(!findings.length) return `<div style="font-family:var(--font-mono);font-size:.7rem;color:var(--green);padding:.3rem 0">✓ No common vulnerabilities detected</div>`;
+  return renderFindings(findings);
+}
+
+const CARD_RENDERERS = {
+  dns: renderDNS, http: renderHTTP, tls: renderTLS,
+  tech: renderTech, security_headers: renderSecHeaders,
+  asn: renderASN, ports: renderPorts, vulns: renderVulns
+};
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  RISK GAUGE                                                                */
+/* ────────────────────────────────────────────────────────────────────────── */
+function updateGauge(score, grade, gradeColor) {
+  const CIRCUMFERENCE = 352;
+  const filled = Math.round((score/100)*CIRCUMFERENCE);
+  const track = document.getElementById('gauge-track');
+  track.style.strokeDasharray = `${filled} ${CIRCUMFERENCE}`;
+  track.style.stroke = gradeColor;
+
+  const numEl   = document.getElementById('gauge-num');
+  const gradeEl = document.getElementById('gauge-grade');
+  numEl.textContent   = score;
+  gradeEl.textContent = grade;
+  gradeEl.style.color = gradeColor;
+
+  show('gauge-card');
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  SEVERITY BREAKDOWN                                                        */
+/* ────────────────────────────────────────────────────────────────────────── */
+function renderSevBreakdown(breakdown) {
+  const panel = document.getElementById('sev-breakdown');
+  const inner = document.getElementById('sev-bars-inner');
+  const order = ['critical','high','medium','low','info'];
+  inner.innerHTML = '';
+  let maxCount = 1;
+  for(const sev of order) maxCount = Math.max(maxCount, breakdown[sev]||0);
+
+  for(const sev of order) {
+    const count = breakdown[sev]||0;
+    const color = SEVERITY_COLORS[sev]||'#4a6a80';
+    const pct   = Math.round((count/maxCount)*100);
+    inner.innerHTML += `
+    <div class="sev-bar-row">
+      <div class="sev-bar-label" style="color:${color}">${sev}</div>
+      <div class="sev-bar-track">
+        <div class="sev-bar-fill sev-fill-${sev}" style="background:${color}"></div>
+      </div>
+      <div class="sev-bar-count">${count}</div>
+    </div>`;
+  }
+  panel.style.display = '';
+  panel.classList.add('visible');
+  setTimeout(()=>{
+    for(const sev of order) {
+      const count = breakdown[sev]||0;
+      const pct   = maxCount ? Math.round((count/maxCount)*100) : 0;
+      const fill  = document.querySelector(`.sev-fill-${sev}`);
+      if(fill) fill.style.width = pct+'%';
+    }
+  }, 400);
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  RISK ITEMS LIST                                                           */
+/* ────────────────────────────────────────────────────────────────────────── */
+function renderRiskItems(items) {
+  const body = document.getElementById('rip-body');
+  const count = document.getElementById('rip-count');
+  if(!items.length) { body.innerHTML='<div style="padding:.7rem 1rem;font-family:var(--font-mono);font-size:.7rem;color:var(--green)">✓ No risk items</div>'; return; }
+
+  const SEV_ORDER = {'critical':0,'high':1,'medium':2,'low':3,'info':4};
+  items.sort((a,b)=>(SEV_ORDER[a.severity]||9)-(SEV_ORDER[b.severity]||9));
+
+  count.textContent = `${items.length} findings`;
+  body.innerHTML = items.map(item=>`
+    <div class="risk-item-row">
+      ${sev_badge(item.severity||'low')}
+      <div class="ri-desc">${escHtml(item.description||'')}</div>
+    </div>`).join('');
+
+  const panel = document.getElementById('risk-items-panel');
+  panel.classList.add('visible');
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  SSE EVENT HANDLING                                                        */
+/* ────────────────────────────────────────────────────────────────────────── */
+function handleEvent(evt) {
+  const data = JSON.parse(evt.data);
+
+  if(data.type === 'status') {
+    document.getElementById('status-text').textContent =
+      `Scanning ${data.hostname}  —  ${data.base_url}`;
+    log(`Target resolved → ${data.hostname} (${data.base_url})`);
+  }
+
+  if(data.type === 'phase') {
+    log(data.message, 'phase');
+  }
+
+  if(data.type === 'module_complete') {
+    const mod = data.module;
+    const d   = data.data;
+    pillDone(mod);
+    const card = document.getElementById('card-'+mod);
+    const body = document.getElementById('cb-'+mod);
+    if(card && body) {
+      const renderer = CARD_RENDERERS[mod];
+      body.innerHTML = renderer ? renderer(d) : renderFindings(d.findings||[]);
+      card.classList.add('visible');
+    }
+    log(`Module complete: ${mod} — ${(d.findings||[]).length} findings`);
+  }
+
+  if(data.type === 'complete') {
+    const risk = data.risk;
+    updateGauge(risk.score, risk.grade, risk.grade_color);
+    renderSevBreakdown(risk.severity_breakdown||{});
+    renderRiskItems(risk.all_risk_items||[]);
+
+    document.getElementById('status-text').textContent =
+      `Scan complete — Score: ${risk.score}/100 (${risk.grade})`;
+    document.getElementById('status-dot').classList.remove('scanning');
+    document.getElementById('status-dot').classList.add('done');
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('scan-btn').textContent = '▶ SCAN';
+    scanActive = false;
+    log(`Scan complete — Risk Score: ${risk.score}/100 Grade: ${risk.grade}`, 'complete');
+    if(es){ es.close(); es=null; }
+  }
+
+  if(data.type === 'timeout') {
+    log('Scan timed out', 'error');
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('scan-btn').textContent = '▶ SCAN';
+    scanActive = false;
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+/*  SCAN CONTROL                                                              */
+/* ────────────────────────────────────────────────────────────────────────── */
+function startScan() {
+  const target = document.getElementById('target-input').value.trim();
+  if(!target) return;
+  if(scanActive && es) { es.close(); es=null; }
+
+  scanActive = true;
+  document.getElementById('scan-btn').disabled = true;
+  document.getElementById('scan-btn').textContent = '⬤ SCANNING';
+  hide('empty-state');
+
+  // Init UI
+  initModulePills();
+  initCards();
+  document.getElementById('log-inner').innerHTML = '';
+  document.getElementById('rip-body').innerHTML  = '';
+  document.getElementById('risk-items-panel').classList.remove('visible');
+  document.getElementById('cards-grid').querySelectorAll('.mod-card').forEach(c=>c.classList.remove('visible'));
+  hide('gauge-card');
+
+  show('status-bar');
+  show('module-track');
+  show('stream-log');
+  show('results');
+
+  document.getElementById('status-dot').className = 'status-dot scanning';
+
+  es = new EventSource(`/scan?target=${encodeURIComponent(target)}`);
+  es.onmessage = handleEvent;
+  es.onerror   = () => {
+    if(!scanActive) return;
+    log('Connection error — scan may have completed', 'error');
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('scan-btn').textContent = '▶ SCAN';
+    scanActive = false;
+    if(es){ es.close(); es=null; }
+  };
+}
+
+/* Enter key */
+document.getElementById('target-input').addEventListener('keydown', e=>{
+  if(e.key==='Enter') startScan();
+});
+</script>
+</body>
+</html>
